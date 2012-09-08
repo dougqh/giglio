@@ -10,7 +10,7 @@ module('my benchmark', {
 
 time('impl1', function(reps) {
   for ( var rep = 0; rep < reps; ++rep ) {
-    //something to time
+    /* something to time */
   }
 });
 
@@ -18,7 +18,7 @@ time('impl2', function(reps) {
   ...
 });
 
-//...more modules...
+/* ...more modules... */
 
 var reps = 10000;
 benchmark(reps);
