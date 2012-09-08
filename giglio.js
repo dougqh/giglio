@@ -99,13 +99,15 @@
     	var timer = {};
     	
     	timer.startTime = function(module, entry) {
-    		//console.time(module.name + ' ' + entry.name);
+    		console.time(module.name + ' ' + entry.name);
     	};
     	
     	timer.endTime = function(module, entry) {
-    		//console.timeEnd(module.name + ' ' + entry.name);
+    		console.timeEnd(module.name + ' ' + entry.name);
     	};
-    });
+    	
+    	return timer;
+    })();
     
     
     /**
@@ -186,18 +188,18 @@
     		
     		module.setup.call(context);
 			try {
-				console.time(funcEntry.name);
-				//config.timer.startTime(module, funcEntry);
+				config.timer.startTime(module, funcEntry);
 			
 				var exception;
 				var result;
 				try {
+					//config.frontend.startFunction(module, funcEntry);
+					
 					funcEntry.func.call(context, reps);
 				} catch ( e ) {
 					exception = e;
 				} finally {
-					console.timeEnd(funcEntry.name);
-					//result = config.timer.endTime(module, funcEntry);
+					result = config.timer.endTime(module, funcEntry);
 				}
 				
 				// truthiness is insufficient because the timing could 
