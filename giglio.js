@@ -12,6 +12,11 @@
 (function(window, undefined) {
     'use strict';
     
+    /**
+     * A simple implementation of a Deferred (similar to jQuery's)
+     * Giglio Executor's return Deferred-s to abstract the actual 
+     * scheduling mechanism.
+     */
     var Deferred = function(result) {
     	var self = {
     		done: false,
