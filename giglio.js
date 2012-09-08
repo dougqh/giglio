@@ -76,14 +76,19 @@
     var consoleFrontend = (function() {
         var frontend = {};
         
-        frontend.module = function(module) {
+        frontend.moduleStart = function(module) {
             console.log('Benchmarking ' + module.name + '...');
         };
-        frontend.success = function(module, funcEntry, timeMs) {
+        frontend.functionStart = function(module, funcEntry) {
+        	console.log('Running ' + funcEntry.name + '...');
+        };
+        frontend.functionSuccess = function(module, funcEntry, timeMs) {
         	console.log(module.name + ' ' + funcEntry.name + ' ' + timeMs + 'ms');
         };
-        frontend.failure = function(module, funcEntry, exception) {
+        frontend.functionFailure = function(module, funcEntry, exception) {
         	console.log(module.name + ' ' + funcEntry.name, exception);
+        };
+        frontend.moduleEnd = function(module) {
         };
         
         return frontend;
@@ -98,11 +103,11 @@
     var consoleTimer = (function() {
     	var timer = {};
     	
-    	timer.startTime = function(module, entry) {
+    	timer.timeStart = function(module, entry) {
     		console.time(module.name + ' ' + entry.name);
     	};
     	
-    	timer.endTime = function(module, entry) {
+    	timer.timeEnd = function(module, entry) {
     		console.timeEnd(module.name + ' ' + entry.name);
     	};
     	
@@ -172,15 +177,21 @@
     	};
     	
     	engine.timeModule = function(config, reps, module) {
-    		config.frontend.module(module);
+    		config.frontend.moduleStart(module);
     		
-    	    return process(config.executor, module.funcEntries, function(funcEntry) {
+    	    var deferred = process(config.executor, module.funcEntries, function(funcEntry) {
     	    	var deferred = Deferred();
     	    	deferred.capture(function() {
     	    		engine.timeFunction(config, reps, module, funcEntry);
     	    	});
     	    	return deferred;
     	    });
+    	    
+    	    deferred.always(function() {
+    	    	config.frontend.moduleEnd(module);
+    	    });
+    	    
+    	    return deferred;
     	};
     	
     	engine.timeFunction = function(config, reps, module, funcEntry) {
@@ -188,26 +199,26 @@
     		
     		module.setup.call(context);
 			try {
-				config.timer.startTime(module, funcEntry);
+				config.timer.timeStart(module, funcEntry);
 			
 				var exception;
 				var result;
 				try {
-					//config.frontend.startFunction(module, funcEntry);
-					
+		    		config.frontend.functionStart(module, funcEntry);
+
 					funcEntry.func.call(context, reps);
 				} catch ( e ) {
 					exception = e;
 				} finally {
-					result = config.timer.endTime(module, funcEntry);
+					result = config.timer.timeEnd(module, funcEntry);
 				}
 				
 				// truthiness is insufficient because the timing could 
 				// potentially be 0ms
 				if ( typeof result !== 'undefined' ) {
-					config.frontend.success(module, funcEntry, result);
+					config.frontend.functionSuccess(module, funcEntry, result);
 				} else if ( typeof exception !== 'undefined' ) {
-					config.frontend.failure(module, funcEntry, exception);
+					config.frontend.functionFailure(module, funcEntry, exception);
 				}
 			} catch ( e ) {
 				config.frontend.error(module, funcEntry, e);
