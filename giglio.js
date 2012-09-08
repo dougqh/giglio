@@ -44,19 +44,19 @@
     })();
     
     var consoleFrontend = (function() {
-        return {
-            module: function(module) {
-                console.log('Benchmarking ' + module.name + '...');
-            },
-            
-            startTime: function(module, entry) {
-                console.time(entry.name);
-            },
-            
-            endTime: function(module, entry) {
-                console.timeEnd(entry.name);
-            }
+        var frontend = {};
+        
+        frontend.module = function(module) {
+            console.log('Benchmarking ' + module.name + '...');
         };
+        frontend.startTime = function(module, entry) {
+            console.time(entry.name);
+        };
+        frontend.endTime = function(module, entry) {
+            console.timeEnd(entry.name);
+        };
+        
+        return frontend;
     })();
     
     var timerBackend = (function() {        
@@ -64,51 +64,49 @@
             window.setTimeout(fn, 0);
         };
         
-        var timerBackend = {
-            benchmark: function(frontend, module, reps) {
-                frontend.module(module);
-                
-                var remainingEntries = module.funcEntries.slice(0, module.funcEntries.length);
-                
-                var timeNext = function() {
-                    if ( ! remainingEntries.length ) {
-                        return;
-                    }
-                    
-                    var entry = remainingEntries.shift();
-                    
-                    var deferred = timerBackend.time(frontend, module, entry, reps);
-                    deferred.success(timeNext);
-                };
-                schedule(timeNext);
-            },
+        var backend = {};
+        backend.benchmark = function(frontend, module, reps) {
+            frontend.module(module);
             
-            time: function(frontend, module, entry, reps) {
-                var deferred = new Deferred();
+            var remainingEntries = module.funcEntries.slice(0, module.funcEntries.length);
+            
+            var timeNext = function() {
+                if ( ! remainingEntries.length ) {
+                    return;
+                }
                 
-                var timeIt = function() {
-                    var context = {};
-                    
-                    module.lifecycle.setup.call(context);
-                    try {
-                        frontend.startTime(module, entry);
-                        
-                        entry.func.call(context, reps);
-                    
-                        frontend.endTime(module, entry);
-                        
-                        deferred.done();
-                    } finally {
-                        module.lifecycle.teardown.call(context);
-                    }
-                };
+                var entry = remainingEntries.shift();
                 
-                schedule(timeIt);
-                return deferred;
-            }
+                var deferred = backend.time(frontend, module, entry, reps);
+                deferred.success(timeNext);
+            };
+            schedule(timeNext);
+        };
+        backend.time = function(frontend, module, entry, reps) {
+            var deferred = new Deferred();
+            
+            var timeIt = function() {
+                var context = {};
+                
+                module.lifecycle.setup.call(context);
+                try {
+                    frontend.startTime(module, entry);
+                    
+                    entry.func.call(context, reps);
+                
+                    frontend.endTime(module, entry);
+                    
+                    deferred.done();
+                } finally {
+                    module.lifecycle.teardown.call(context);
+                }
+            };
+            
+            schedule(timeIt);
+            return deferred;
         };
         
-        return timerBackend;
+        return backend;
     })();
     
     var giglio = (function() {
