@@ -81,6 +81,7 @@
     var consoleFrontend = (function() {
         var frontend = {};
         frontend.id = 'console';
+        frontend.requiresOutput = false;
         
         frontend.moduleStart = function(module) {
             console.log('Benchmarking ' + module.name + '...');
@@ -109,6 +110,7 @@
     var consoleTimer = (function() {
         var timer = {};
         timer.id = 'console';
+        timer.hasOutput = false;
         
         timer.timeStart = function(module, entry) {
             console.time(module.name + ' - ' + entry.name);
@@ -183,6 +185,13 @@
         var engine = {};
         
         engine.timeAll = function(config, reps, modules) {
+        	if ( config.frontend.requiresOutput && ! config.timer.hasOutput ) {
+        		throw new Error(
+        			'incompatible combination using timer without output ' + 
+        			'with a front-end that requires output'
+        		);
+        	}
+        
             return process(config.executor, modules, function(module) {
                 return engine.timeModule(config, reps, module);
             });
