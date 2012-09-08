@@ -109,11 +109,11 @@
     	var timer = {};
     	
     	timer.timeStart = function(module, entry) {
-    		console.time(module.name + ' ' + entry.name);
+    		console.time(module.name + ' - ' + entry.name);
     	};
     	
     	timer.timeEnd = function(module, entry) {
-    		console.timeEnd(module.name + ' ' + entry.name);
+    		console.timeEnd(module.name + ' - ' + entry.name);
     	};
     	
     	return timer;
@@ -177,7 +177,7 @@
     	
     	engine.timeAll = function(config, reps, modules) {
     		return process(config.executor, modules, function(module) {
-    			engine.timeModule(config, reps, module);
+    			return engine.timeModule(config, reps, module);
     		});
     	};
     	
