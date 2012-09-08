@@ -135,7 +135,6 @@
                 funcEntries: []
             };
         };
-        
         giglio.time = function(name, fn) {
             if ( ! module ) {
                 giglio.module('Benchmark');
@@ -143,7 +142,6 @@
             
             module.funcEntries.push({name: name, func: fn});
         };
-        
         giglio.benchmark = function(reps) {
             config.backend.benchmark(config.frontend, module, reps);
         };
@@ -152,6 +150,7 @@
     })();
     
     window.giglio = giglio;
+    // If nothing conflicts add functions to global namespace for convenience.
     window.module = window.module || giglio.module;
     window.time = window.time || giglio.time;
     window.benchmark = window.benchmark || giglio.benchmark;
