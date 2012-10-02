@@ -1,0 +1,4 @@
+Giglio TODO:
+  Add way to set config parameters
+  Add output of parameters
+  Add self warm-up phase to avoid result skew

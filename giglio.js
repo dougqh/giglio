@@ -322,7 +322,7 @@
 	engine._warmup = function(config, reps, module, funcEntry, context) {
 		try {
 			// Call repeatedly with a single rep to make sure the function gets JIT-ed.
-			for ( var i = 0; i < config.warmup; ++i ) {
+			for ( var i = 0; i < reps; ++i ) {
 				funcEntry.func.call(context, 1);
 			}
 			return true;
@@ -370,7 +370,6 @@
         giglio.immediateExecutor = immediateExecutor;
         
         var config = {
-        	warmup: 1000,
             frontend: giglio.consoleFrontend,
             timer: giglio.defaultTimer,
             executor: giglio.timeoutExecutor
