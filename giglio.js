@@ -86,10 +86,10 @@
         frontend.moduleStart = function(module) {
             console.log('Benchmarking ' + module.name + '...');
         };
-        frontend.functionStart = function(module, funcEntry, reps) {
-            console.log('Running ' + funcEntry.name + ' for ' + reps + ' reps...');
+        frontend.functionStart = function(module, funcEntry, parameterSet, reps) {
+            console.log('Running ' + funcEntry.name + ' ' + parameterSet + ' for ' + reps + ' reps...');
         };
-        frontend.functionSuccess = function(module, funcEntry, timeMs, reps ) {
+        frontend.functionSuccess = function(module, funcEntry, parameterSet, reps, timeMs ) {
             console.log(module.name + ' ' + funcEntry.name + ' ' + ( timeMs / reps ) + 'ms/rep');
         };
         frontend.functionFailure = function(module, funcEntry, exception) {
@@ -338,22 +338,22 @@
 		config.timer.timeStart(module, funcEntry);
 	
 		var exception;
-		var result;
+		var timeMs;
 		try {
-			config.frontend.functionStart(module, funcEntry, reps, parameterSet);
+			config.frontend.functionStart(module, funcEntry, parameterSet, reps);
 
 			funcEntry.func.call(context, reps);
 		} catch ( e ) {
 			exception = e;
 		} finally {
-			result = config.timer.timeEnd(module, funcEntry, parameterSet);
+			timeMs = config.timer.timeEnd(module, funcEntry, parameterSet);
 		}
 		
 		// truthiness is insufficient because the timing could potentially be 0ms
 		if ( typeof result !== 'undefined' ) {
-			config.frontend.functionSuccess(module, funcEntry, result, reps);
+			config.frontend.functionSuccess(module, funcEntry, parameterSet, reps, timeMs);
 		} else if ( typeof exception !== 'undefined' ) {
-			config.frontend.functionFailure(module, funcEntry, exception);
+			config.frontend.functionFailure(module, funcEntry, parameterSet, exception);
 		}
 	};
     
