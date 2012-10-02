@@ -303,28 +303,11 @@
         engine.timeFunction = function(config, reps, module, funcEntry, parameterSet) {
             var context = {};
             
-            module.setup.call(context);
+            module.setup.call(context, parameterSet);
             try {
-                config.timer.timeStart(module, funcEntry);
-            
-                var exception;
-                var result;
-                try {
-                    config.frontend.functionStart(module, funcEntry, reps);
-
-                    funcEntry.func.call(context, reps);
-                } catch ( e ) {
-                    exception = e;
-                } finally {
-                    result = config.timer.timeEnd(module, funcEntry);
-                }
-                
-                // truthiness is insufficient because the timing could potentially be 0ms
-                if ( typeof result !== 'undefined' ) {
-                    config.frontend.functionSuccess(module, funcEntry, result, reps);
-                } else if ( typeof exception !== 'undefined' ) {
-                    config.frontend.functionFailure(module, funcEntry, exception);
-                }
+				if ( engine._warmup(config, reps, module, funcEntry, context) ) {
+					engine._execute(config, reps, module, funcEntry, context, parameterSet);
+				}
             } catch ( e ) {
                 config.frontend.error(module, funcEntry, e);
                 throw e;
@@ -336,6 +319,41 @@
         return engine;
     })();
     
+	engine._warmup = function(config, reps, module, funcEntry, context) {
+		try {
+			// Call repeatedly with a single rep to make sure the function gets JIT-ed.
+			for ( var i = 0; i < config.warmup; ++i ) {
+				funcEntry.func.call(context, 1);
+			}
+			return true;
+		} catch ( e ) {
+			config.frontend.functionFailure(module, funcEntry, e);
+			return false;
+		}
+	};
+	
+	engine._execute = function(config, reps, module, funcEntry, context, parameterSet) {
+		config.timer.timeStart(module, funcEntry);
+	
+		var exception;
+		var result;
+		try {
+			config.frontend.functionStart(module, funcEntry, reps, parameterSet);
+
+			funcEntry.func.call(context, reps);
+		} catch ( e ) {
+			exception = e;
+		} finally {
+			result = config.timer.timeEnd(module, funcEntry, parameterSet);
+		}
+		
+		// truthiness is insufficient because the timing could potentially be 0ms
+		if ( typeof result !== 'undefined' ) {
+			config.frontend.functionSuccess(module, funcEntry, result, reps);
+		} else if ( typeof exception !== 'undefined' ) {
+			config.frontend.functionFailure(module, funcEntry, exception);
+		}
+	};
     
     /**
      * The actual exposed API
@@ -352,6 +370,7 @@
         giglio.immediateExecutor = immediateExecutor;
         
         var config = {
+        	warmup: 1000,
             frontend: giglio.consoleFrontend,
             timer: giglio.defaultTimer,
             executor: giglio.timeoutExecutor
