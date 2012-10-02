@@ -112,6 +112,9 @@
         timer.id = 'console';
         timer.hasOutput = false;
         
+        timer.envCompatible = function() {
+        	return ( typeof console.time !== 'undefined' )
+        };
         timer.timeStart = function(module, entry) {
             console.time(module.name + ' - ' + entry.name);
         };
@@ -122,6 +125,36 @@
         return timer;
     })();
     
+    /**
+     * Date timer
+     */
+    var dateTimer = (function() {
+    	var timer = {};
+    	timer.id = 'date';
+    	timer.hasOutput = true;
+    	
+    	timer.envCompatible = function() {
+    		return ( typeof Date !== 'undefined' );
+    	};
+    	timer.timeStart = function(module, entry) {
+    		this._start = new Date().getTime();	
+    	};
+    	
+    	timer.timeEnd = function(module, entry) {
+    		return new Date().getTime() - this._start;
+    	};
+    	
+    	return timer;
+    })();
+    
+    var defaultTimer = (function() {
+    	if ( consoleTimer.envCompatible() ) {
+    		return consoleTimer;
+    	}
+    	if ( dateTimer.envCompatible() ) {
+    		return dateTimer;
+    	}
+    })();
     
     /**
      * Executor that uses window.setTimeout to schedule timing runs
@@ -262,13 +295,15 @@
         giglio.Deferred = Deferred;
         giglio.consoleFrontend = consoleFrontend;
         giglio.consoleTimer = consoleTimer;
+        giglio.dateTimer = dateTimer;
+        giglio.defaultTimer = defaultTimer;
         giglio.timeoutExecutor = timeoutExecutor;
         giglio.immediateExecutor = immediateExecutor;
         
         var config = {
             frontend: giglio.consoleFrontend,
-            timer: giglio.consoleTimer,
-            executor: timeoutExecutor
+            timer: giglio.defaultTimer,
+            executor: giglio.timeoutExecutor
         };
         
         var modules = [];
