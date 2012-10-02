@@ -86,11 +86,11 @@
         frontend.moduleStart = function(module) {
             console.log('Benchmarking ' + module.name + '...');
         };
-        frontend.functionStart = function(module, funcEntry) {
-            console.log('Running ' + funcEntry.name + '...');
+        frontend.functionStart = function(module, funcEntry, reps) {
+            console.log('Running ' + funcEntry.name + ' for ' + reps + ' reps...');
         };
-        frontend.functionSuccess = function(module, funcEntry, timeMs) {
-            console.log(module.name + ' ' + funcEntry.name + ' ' + timeMs + 'ms');
+        frontend.functionSuccess = function(module, funcEntry, timeMs, reps ) {
+            console.log(module.name + ' ' + funcEntry.name + ' ' + ( timeMs / reps ) + 'ms/rep');
         };
         frontend.functionFailure = function(module, funcEntry, exception) {
             console.log(module.name + ' ' + funcEntry.name, exception);
@@ -258,7 +258,7 @@
                 var exception;
                 var result;
                 try {
-                    config.frontend.functionStart(module, funcEntry);
+                    config.frontend.functionStart(module, funcEntry, reps);
 
                     funcEntry.func.call(context, reps);
                 } catch ( e ) {
@@ -270,7 +270,7 @@
                 // truthiness is insufficient because the timing could 
                 // potentially be 0ms
                 if ( typeof result !== 'undefined' ) {
-                    config.frontend.functionSuccess(module, funcEntry, result);
+                    config.frontend.functionSuccess(module, funcEntry, result, reps);
                 } else if ( typeof exception !== 'undefined' ) {
                     config.frontend.functionFailure(module, funcEntry, exception);
                 }
