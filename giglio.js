@@ -182,7 +182,9 @@
         executor.id = 'immediate';
         
         executor.schedule = function(fn, thisObj, args) {
-            fn.apply(thisObj, args);
+        	var deferred = Deferred();
+        	deferred.catpure(fn, thisObj, args);
+        	return deferred;
         };
         
         return executor;
