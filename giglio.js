@@ -192,7 +192,7 @@
     /**
      * Engine that drives the running of the time functions
      */
-        var engine = (function() {
+    var engine = (function() {
         var process = function(executor, array, deferredFn) {
             var overallDeferred = Deferred();
             
@@ -230,15 +230,57 @@
             });
         };
         
+        engine.calculateParameterSetsFor = function(module) {
+        	var combinations = [];
+        	
+        	// Builds up a full cartesian product of parameter combinations
+        	// through multiple successive passes.
+        	for ( var property in module.params ) {
+        		if ( ! module.params.hasOwnProperty(property) ) {
+        			continue;
+        		}
+        		
+        		var values = module.params[property];
+        		
+        		if ( combinations.length === 0 ) {
+        			// first pass is seeding pass for the first property
+        			for ( var i = 0, len = values.length; i < len; ++i ) {
+        				var combination = {};
+        				combination[property] = values[i];
+        				
+        				combinations.push(combination);
+        			}
+        		} else {
+        			// successive passes - clone the first and for each 
+        			// entry create N new entries for all possible values
+        			
+        			var oldCombinations = combinations.slice(0, combinations.length);
+        			combinations = [];
+        			for ( var i = 0, outerLen = oldCombinations.length; i < outerLen; ++i ) {
+        				for ( var j = 0, innerLen = values.length; j < innerLen; ++j ) {
+        					var combination = oldCombinations[i];
+        					combination[property] = values[j];
+        					
+        					combinations.push(combination);
+        				}
+        			}
+        		}
+        	}
+        	
+        	if ( combinations.length === 0 ) {
+        		combinations.push(undefined);	
+        	}
+        	
+        	return combinations;
+        };
+        
         engine.timeModule = function(config, reps, module) {
             config.frontend.moduleStart(module);
             
-            var deferred = process(config.executor, module.funcEntries, function(funcEntry) {
-                var deferred = Deferred();
-                deferred.capture(function() {
-                    engine.timeFunction(config, reps, module, funcEntry);
-                });
-                return deferred;
+            var parameterSets = engine.calculateParameterSetsFor(module);
+            
+            var deferred = process(config.executor, parameterSets, function(parameterSet) {
+            	return engine.timeParameterSet(config, reps, module, parameterSet);
             });
             
             deferred.always(function() {
@@ -248,7 +290,17 @@
             return deferred;
         };
         
-        engine.timeFunction = function(config, reps, module, funcEntry) {
+        engine.timeParameterSet = function(config, reps, module, parameterSet) {
+        	return process(config.executor, module.funcEntries, function(funcEntry) {
+                var deferred = Deferred();
+                deferred.capture(function() {
+                    engine.timeFunction(config, reps, module, funcEntry, parameterSet);
+                });
+                return deferred;
+            });
+        };
+        
+        engine.timeFunction = function(config, reps, module, funcEntry, parameterSet) {
             var context = {};
             
             module.setup.call(context);
@@ -267,8 +319,7 @@
                     result = config.timer.timeEnd(module, funcEntry);
                 }
                 
-                // truthiness is insufficient because the timing could 
-                // potentially be 0ms
+                // truthiness is insufficient because the timing could potentially be 0ms
                 if ( typeof result !== 'undefined' ) {
                     config.frontend.functionSuccess(module, funcEntry, result, reps);
                 } else if ( typeof exception !== 'undefined' ) {
@@ -313,12 +364,14 @@
         giglio.module = function(name, options) {
             var module = {
                 name: name,
+                params: {},
                 setup: nop,
                 teardown: nop,
                 funcEntries: []
             };
             
             if ( options ) {
+            	module.params = options.params || module.params;
                 module.setup = options.setup || module.setup;
                 module.teardown = options.teardown || module.teardown;
             }
