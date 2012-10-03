@@ -147,6 +147,9 @@
     	return timer;
     })();
     
+    /**
+     * The automatically chosen timer for this platform.
+     */
     var defaultTimer = (function() {
     	if ( consoleTimer.envCompatible() ) {
     		return consoleTimer;
@@ -195,6 +198,13 @@
      * Engine that drives the running of the time functions
      */
     var engine = (function() {
+    	/**
+    	 * Helper function that successively schedules each element of 
+    	 * an array to be processed by a function that returns deferred.
+    	 * 
+    	 * process returns a deferred itself to indicate when the entire 
+    	 * array is done being processed.
+    	 */
         var process = function(executor, array, deferredFn) {
             var overallDeferred = Deferred();
             
@@ -244,6 +254,9 @@
         
         var engine = {};
         
+        /**
+         * Benchmarks a list of modules - returns a deferred to track progress
+         */
         engine.timeAll = function(config, reps, modules) {
         	if ( config.frontend.requiresOutput && ! config.timer.hasOutput ) {
         		throw new Error(
@@ -257,6 +270,11 @@
             });
         };
         
+        /**
+         * Produces a cartesian product of all parameter options for a module.
+         * If the module has no parameters, a list containing a single "undefined"
+         * entry is returned.
+         */
         engine.calculateParameterSetsFor = function(module) {
         	var combinations = [];
         	
@@ -301,6 +319,9 @@
         	return combinations;
         };
         
+        /**
+         * Benchmarks a module - looping through all ParameterSet and function combinations
+         */
         engine.timeModule = function(config, reps, module) {
         	module.toString = Module_toString;
         	
@@ -319,6 +340,9 @@
             return deferred;
         };
         
+        /**
+         * Benchmarks all functions in a module with a specified parameterSet
+         */
         engine.timeParameterSet = function(config, reps, module, parameterSet) {
         	if ( parameterSet ) {
 				parameterSet.toString = ParameterSet_toString;
@@ -333,6 +357,9 @@
             });
         };
         
+        /**
+         * Benchmarks a function / parameter set combination
+         */
         engine.timeFunction = function(config, reps, module, funcEntry, parameterSet) {
             var context = {};
             
@@ -348,12 +375,16 @@
                 module.teardown.call(context);
             }                
         };
-            
+          
+        /**
+         * Warms up a function in attempt to make sure it is JIT-ed
+         */  
 		engine._warmup = function(config, reps, module, funcEntry, context) {
 			try {
-				// Call repeatedly with a single rep to make sure the function gets JIT-ed.
+				// Call repeatedly with a small number of reps to make sure the function
+				// gets JIT-ed.
 				for ( var i = 0; i < reps; ++i ) {
-					funcEntry.func.call(context, 1);
+					funcEntry.func.call(context, 10);
 				}
 				return true;
 			} catch ( e ) {
@@ -362,6 +393,9 @@
 			}
 		};
 	
+		/**
+		 * Executes a function / parameter set combination and times its execution
+		 */
 		engine._execute = function(config, reps, module, funcEntry, context, parameterSet) {
 			var combinedEntry = {
 				name: funcEntry.name,
