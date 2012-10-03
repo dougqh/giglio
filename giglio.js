@@ -84,16 +84,16 @@
         frontend.requiresOutput = false;
         
         frontend.moduleStart = function(module) {
-            console.log('Benchmarking ' + module.name + '...');
+            console.log('Benchmarking ' + module + '...');
         };
-        frontend.functionStart = function(module, funcEntry, parameterSet, reps) {
-            console.log('Running ' + funcEntry.name + ' ' + parameterSet + ' for ' + reps + ' reps...');
+        frontend.functionStart = function(module, funcEntry, reps) {
+            console.log('Running ' + funcEntry + ' for ' + reps + ' reps...');
         };
-        frontend.functionSuccess = function(module, funcEntry, parameterSet, reps, timeMs ) {
-            console.log(module.name + ' ' + funcEntry.name + ' ' + ( timeMs / reps ) + 'ms/rep');
+        frontend.functionSuccess = function(module, funcEntry, reps, timeMs ) {
+            console.log(module + ' ' + funcEntry + ' ' + ( timeMs / reps ) + 'ms/rep');
         };
         frontend.functionFailure = function(module, funcEntry, exception) {
-            console.log(module.name + ' ' + funcEntry.name, exception);
+            console.log(module + ' ' + funcEntry, exception);
         };
         frontend.moduleEnd = function(module) {
         };
@@ -116,10 +116,10 @@
         	return ( typeof console.time !== 'undefined' )
         };
         timer.timeStart = function(module, entry) {
-            console.time(module.name + ' - ' + entry.name);
+            console.time(module + ' - ' + entry);
         };
         timer.timeEnd = function(module, entry) {
-            console.timeEnd(module.name + ' - ' + entry.name);
+            console.timeEnd(module + ' - ' + entry);
         };
         
         return timer;
@@ -217,6 +217,31 @@
             return overallDeferred;
         };
         
+        // toString implementations that are patched onto simple structs 
+        // to make them easier to work with for output.
+        var Module_toString = function() {
+        	return this.name;
+        };
+        
+        var ParameterSet_toString = function() {
+        	var parts = [];
+        	for ( var key in this ) {
+        		if ( this.hasOwnProperty(key) && ( key !== 'toString' ) ) {
+        			parts.push( key + ' = ' + this[key] );
+        		}
+        	}
+        	return parts.join(', ');
+        };
+        
+        var CombinedEntry_toString = function() {
+        	if ( this.parameterSet ) {
+        		return this.name + ' ' + this.parameterSet;
+        	} else {
+        		return this.name;
+        	}
+        };
+        
+        
         var engine = {};
         
         engine.timeAll = function(config, reps, modules) {
@@ -277,6 +302,8 @@
         };
         
         engine.timeModule = function(config, reps, module) {
+        	module.toString = Module_toString;
+        	
             config.frontend.moduleStart(module);
             
             var parameterSets = engine.calculateParameterSetsFor(module);
@@ -293,6 +320,10 @@
         };
         
         engine.timeParameterSet = function(config, reps, module, parameterSet) {
+        	if ( parameterSet ) {
+				parameterSet.toString = ParameterSet_toString;
+			}
+        	
         	return process(config.executor, module.funcEntries, function(funcEntry) {
                 var deferred = Deferred();
                 deferred.capture(function() {
@@ -317,45 +348,51 @@
                 module.teardown.call(context);
             }                
         };
+            
+		engine._warmup = function(config, reps, module, funcEntry, context) {
+			try {
+				// Call repeatedly with a single rep to make sure the function gets JIT-ed.
+				for ( var i = 0; i < reps; ++i ) {
+					funcEntry.func.call(context, 1);
+				}
+				return true;
+			} catch ( e ) {
+				config.frontend.functionFailure(module, funcEntry, e);
+				return false;
+			}
+		};
+	
+		engine._execute = function(config, reps, module, funcEntry, context, parameterSet) {
+			var combinedEntry = {
+				name: funcEntry.name,
+				parameterSet: parameterSet,
+				toString: CombinedEntry_toString
+			};
+				
+			config.timer.timeStart(module, combinedEntry);
+		
+			var exception;
+			var timeMs;
+			try {
+				config.frontend.functionStart(module, combinedEntry, reps);
+	
+				funcEntry.func.call(context, reps);
+			} catch ( e ) {
+				exception = e;
+			} finally {
+				timeMs = config.timer.timeEnd(module, combinedEntry);
+			}
+			
+			// truthiness is insufficient because the timing could potentially be 0ms
+			if ( typeof result !== 'undefined' ) {
+				config.frontend.functionSuccess(module, combinedEntry, reps, timeMs);
+			} else if ( typeof exception !== 'undefined' ) {
+				config.frontend.functionFailure(module, combinedEntry, exception);
+			}
+		};
         
         return engine;
     })();
-    
-	engine._warmup = function(config, reps, module, funcEntry, context) {
-		try {
-			// Call repeatedly with a single rep to make sure the function gets JIT-ed.
-			for ( var i = 0; i < reps; ++i ) {
-				funcEntry.func.call(context, 1);
-			}
-			return true;
-		} catch ( e ) {
-			config.frontend.functionFailure(module, funcEntry, e);
-			return false;
-		}
-	};
-	
-	engine._execute = function(config, reps, module, funcEntry, context, parameterSet) {
-		config.timer.timeStart(module, funcEntry);
-	
-		var exception;
-		var timeMs;
-		try {
-			config.frontend.functionStart(module, funcEntry, parameterSet, reps);
-
-			funcEntry.func.call(context, reps);
-		} catch ( e ) {
-			exception = e;
-		} finally {
-			timeMs = config.timer.timeEnd(module, funcEntry, parameterSet);
-		}
-		
-		// truthiness is insufficient because the timing could potentially be 0ms
-		if ( typeof result !== 'undefined' ) {
-			config.frontend.functionSuccess(module, funcEntry, parameterSet, reps, timeMs);
-		} else if ( typeof exception !== 'undefined' ) {
-			config.frontend.functionFailure(module, funcEntry, parameterSet, exception);
-		}
-	};
     
     /**
      * The actual exposed API
