@@ -11,6 +11,8 @@
 
 (function(window, undefined) {
     'use strict';
+        
+	var nop = function() {};
     
     /**
      * A simple implementation of a Deferred (similar to jQuery's)
@@ -75,6 +77,27 @@
         return deferred;
     };
     
+    
+    /**
+     * no-op implementation of a front-end mostly used for warm-up
+     */
+    var nopFrontend = (function() {
+    	var frontend = {};
+    	frontend.id = 'nop';
+    	frontend.requiresOutput = false;
+    	
+    	frontend.envCompatible = function() {
+    		return true;
+    	};
+    	frontend.moduleStart = nop;
+    	frontend.functionStart = nop;
+    	frontend.functionSuccess = nop;
+    	frontend.functionFailure = nop;
+    	frontend.moduleEnd = nop;
+    	
+    	return frontend;
+    })();
+    
     /**
      * Frontend that writes output to the console
      */    
@@ -83,6 +106,9 @@
         frontend.id = 'console';
         frontend.requiresOutput = false;
         
+        frontend.envCompatible = function() {
+        	return console ? true : false;
+        };
         frontend.moduleStart = function(module) {
             console.log('Benchmarking ' + module + '...');
         };
@@ -101,6 +127,22 @@
         return frontend;
     })();
     
+    /**
+     * no-op implementation of a front-end mostly used for warm-up
+     */
+    var nopTimer = (function() {
+    	var timer = {};
+    	timer.id = 'nop';
+    	timer.hasOutput = false;
+    	
+    	timer.envCompatible = function() {
+    		return true;
+    	};
+    	timer.timeStart = nop;
+    	timer.timeEnd = nop;
+    	
+    	return timer;
+    })();
     
     /**
      * Timer that uses built-in console.time and timeEnd functions.
@@ -113,7 +155,7 @@
         timer.hasOutput = false;
         
         timer.envCompatible = function() {
-        	return ( typeof console.time !== 'undefined' )
+        	return ( console && console.time ) ? true : false;
         };
         timer.timeStart = function(module, entry) {
             console.time(module + ' - ' + entry);
@@ -193,6 +235,28 @@
         return executor;
     })();
     
+    /**
+     * Simple module used to warm-up Giglio's internal machinery
+     */
+    var warmupModule = (function() {
+    	var filler = function(reps) {
+    		var sum = 0;
+    		for ( var rep = 0; rep < reps; ++rep ) {
+    			sum += rep;
+    		}
+    		return sum;
+    	};
+    	
+		return {
+			name: name,
+			params: {},
+			setup: nop,
+			teardown: nop,
+			funcEntries: [
+				{name: 'filler', func: filler}
+			]
+		};
+    })();
     
     /**
      * Engine that drives the running of the time functions
@@ -200,7 +264,9 @@
     var engine = (function() {
     	/**
     	 * Helper function that successively schedules each element of 
-    	 * an array to be processed by a function that returns deferred.
+    	 * an array to be processed by a function that returns a deferred.
+    	 *
+    	 * Or, an array of functions that return a deferred to run successively.
     	 * 
     	 * process returns a deferred itself to indicate when the entire 
     	 * array is done being processed.
@@ -218,10 +284,17 @@
                     executor.schedule(next);
                 }
             };
-            next = function(deferred) {
-                var deferred = deferredFn(queue.shift());
-                deferred.always(scheduleNext);
-            };
+            if ( deferredFn ) {      
+				next = function() {
+					var deferred = deferredFn(queue.shift());
+					deferred.always(scheduleNext);
+				};
+            } else {
+            	next = function() {
+            		var deferred = (queue.shift())();
+            		deferred.always(scheduleNext);
+            	};
+            }
             scheduleNext();
             
             return overallDeferred;
@@ -264,7 +337,28 @@
         			'with a front-end that requires output'
         		);
         	}
+        	
+			return process(config.executor, [
+				function() {
+					return engine.warmup(config);
+				},
+				function() {
+					return engine.timeModules(config, reps, modules);
+				}
+			]);
+        };
         
+        engine.warmup = function(config) {
+        	var warmupConfig = {
+        		executor: config.executor,
+        		frontend: nopFrontend,
+        		timer: nopTimer
+        	};
+        	
+        	return engine.timeModule(warmupConfig, 100, warmupModule);
+        };
+        
+        engine.timeModules = function(config, reps, modules) {
             return process(config.executor, modules, function(module) {
                 return engine.timeModule(config, reps, module);
             });
@@ -365,8 +459,8 @@
             
             module.setup.call(context, parameterSet);
             try {
-				if ( engine._warmup(config, reps, module, funcEntry, context) ) {
-					engine._execute(config, reps, module, funcEntry, context, parameterSet);
+				if ( engine._warmupFunction(config, reps, module, funcEntry, context) ) {
+					engine._executeFunction(config, reps, module, funcEntry, context, parameterSet);
 				}
             } catch ( e ) {
                 config.frontend.error(module, funcEntry, e);
@@ -379,12 +473,12 @@
         /**
          * Warms up a function in attempt to make sure it is JIT-ed
          */  
-		engine._warmup = function(config, reps, module, funcEntry, context) {
+		engine._warmupFunction = function(config, reps, module, funcEntry, context) {
 			try {
-				// Call repeatedly with a small number of reps to make sure the function
-				// gets JIT-ed.
-				for ( var i = 0; i < reps; ++i ) {
-					funcEntry.func.call(context, 1);
+				// Call repeatedly with a small number of reps to make sure the 
+				// function gets JIT-ed.
+				for ( var i = 0; i < 100; ++i ) {
+					funcEntry.func.call(context, 10);
 				}
 				return true;
 			} catch ( e ) {
@@ -392,31 +486,31 @@
 				return false;
 			}
 		};
-
+	
 		/**
 		 * Executes a function / parameter set combination and times its execution
 		 */
-		engine._execute = function(config, reps, module, funcEntry, context, parameterSet) {
+		engine._executeFunction = function(config, reps, module, funcEntry, context, parameterSet) {
 			var combinedEntry = {
 				name: funcEntry.name,
 				parameterSet: parameterSet,
 				toString: CombinedEntry_toString
 			};
-
+				
 			config.timer.timeStart(module, combinedEntry);
-
+		
 			var exception;
 			var timeMs;
 			try {
 				config.frontend.functionStart(module, combinedEntry, reps);
-
+	
 				funcEntry.func.call(context, reps);
 			} catch ( e ) {
 				exception = e;
 			} finally {
 				timeMs = config.timer.timeEnd(module, combinedEntry);
 			}
-
+			
 			// truthiness is insufficient because the timing could potentially be 0ms
 			if ( typeof result !== 'undefined' ) {
 				config.frontend.functionSuccess(module, combinedEntry, reps, timeMs);
@@ -449,8 +543,6 @@
         };
         
         var modules = [];
-        
-        var nop = function() {};
         
         giglio.module = function(name, options) {
             var module = {
