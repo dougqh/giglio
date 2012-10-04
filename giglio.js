@@ -83,9 +83,6 @@
         frontend.id = 'console';
         frontend.requiresOutput = false;
         
-        frontend.envCompatible = function() {
-        	return console ? true : false;
-        };
         frontend.moduleStart = function(module) {
             console.log('Benchmarking ' + module + '...');
         };
@@ -116,7 +113,7 @@
         timer.hasOutput = false;
         
         timer.envCompatible = function() {
-        	return ( console && console.time ) ? true : false;
+        	return ( typeof console.time !== 'undefined' )
         };
         timer.timeStart = function(module, entry) {
             console.time(module + ' - ' + entry);
@@ -387,7 +384,7 @@
 				// Call repeatedly with a small number of reps to make sure the function
 				// gets JIT-ed.
 				for ( var i = 0; i < reps; ++i ) {
-					funcEntry.func.call(context, 10);
+					funcEntry.func.call(context, 1);
 				}
 				return true;
 			} catch ( e ) {
@@ -395,7 +392,7 @@
 				return false;
 			}
 		};
-	
+
 		/**
 		 * Executes a function / parameter set combination and times its execution
 		 */
@@ -405,21 +402,21 @@
 				parameterSet: parameterSet,
 				toString: CombinedEntry_toString
 			};
-				
+
 			config.timer.timeStart(module, combinedEntry);
-		
+
 			var exception;
 			var timeMs;
 			try {
 				config.frontend.functionStart(module, combinedEntry, reps);
-	
+
 				funcEntry.func.call(context, reps);
 			} catch ( e ) {
 				exception = e;
 			} finally {
 				timeMs = config.timer.timeEnd(module, combinedEntry);
 			}
-			
+
 			// truthiness is insufficient because the timing could potentially be 0ms
 			if ( typeof result !== 'undefined' ) {
 				config.frontend.functionSuccess(module, combinedEntry, reps, timeMs);
