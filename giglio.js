@@ -83,6 +83,9 @@
         frontend.id = 'console';
         frontend.requiresOutput = false;
         
+        frontend.envCompatible = function() {
+        	return console ? true : false;
+        };
         frontend.moduleStart = function(module) {
             console.log('Benchmarking ' + module + '...');
         };
@@ -113,7 +116,7 @@
         timer.hasOutput = false;
         
         timer.envCompatible = function() {
-        	return ( typeof console.time !== 'undefined' )
+        	return ( console && console.time ) ? true : false;
         };
         timer.timeStart = function(module, entry) {
             console.time(module + ' - ' + entry);
