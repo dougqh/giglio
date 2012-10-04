@@ -109,6 +109,9 @@
         frontend.envCompatible = function() {
         	return console ? true : false;
         };
+        frontend.warmup = function() {
+        	console.log('Initializing console frontend...');
+        };
         frontend.moduleStart = function(module) {
             console.log('Benchmarking ' + module + '...');
         };
@@ -154,6 +157,11 @@
         timer.id = 'console';
         timer.hasOutput = false;
         
+        timer.warmup = function() {
+        	console.log('Initializing console timer...');
+        	console.time('DONE');
+        	console.timeEnd('DONE');
+        };
         timer.envCompatible = function() {
         	return ( console && console.time ) ? true : false;
         };
@@ -175,6 +183,9 @@
     	timer.id = 'date';
     	timer.hasOutput = true;
     	
+    	timer.warmup = function() {
+    		new Date().getTime();
+    	};
     	timer.envCompatible = function() {
     		return ( typeof Date !== 'undefined' );
     	};
@@ -349,12 +360,14 @@
         };
         
         engine.warmup = function(config) {
+        	config.frontend.warmup();
+        	config.timer.warmup();
+        	
         	var warmupConfig = {
         		executor: config.executor,
         		frontend: nopFrontend,
         		timer: nopTimer
         	};
-        	
         	return engine.timeModule(warmupConfig, 100, warmupModule);
         };
         
