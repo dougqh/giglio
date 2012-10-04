@@ -509,26 +509,29 @@
 				parameterSet: parameterSet,
 				toString: CombinedEntry_toString
 			};
-				
-			config.timer.timeStart(module, combinedEntry);
 		
-			var exception;
-			var timeMs;
+		
+			config.frontend.functionStart(module, combinedEntry, reps);
 			try {
-				config.frontend.functionStart(module, combinedEntry, reps);
-	
-				funcEntry.func.call(context, reps);
-			} catch ( e ) {
-				exception = e;
-			} finally {
-				timeMs = config.timer.timeEnd(module, combinedEntry);
-			}
+				config.timer.timeStart(module, combinedEntry);
 			
-			// truthiness is insufficient because the timing could potentially be 0ms
-			if ( typeof result !== 'undefined' ) {
-				config.frontend.functionSuccess(module, combinedEntry, reps, timeMs);
-			} else if ( typeof exception !== 'undefined' ) {
-				config.frontend.functionFailure(module, combinedEntry, exception);
+				var exception;
+				var timeMs;
+				try {
+		
+					funcEntry.func.call(context, reps);
+				} catch ( e ) {
+					exception = e;
+				} finally {
+					timeMs = config.timer.timeEnd(module, combinedEntry);
+				}
+			} finally {
+				// truthiness is insufficient because the timing could potentially be 0ms
+				if ( typeof result !== 'undefined' ) {
+					config.frontend.functionSuccess(module, combinedEntry, reps, timeMs);
+				} else if ( typeof exception !== 'undefined' ) {
+					config.frontend.functionFailure(module, combinedEntry, exception);
+				}
 			}
 		};
         
