@@ -166,10 +166,11 @@
             return ( console && console.time ) ? true : false;
         };
         timer.timeStart = function(module, entry) {
-            console.time(module + ' - ' + entry);
+        	this._timerName = module + ' - ' + entry;
+            console.time(this._timerName);
         };
         timer.timeEnd = function(module, entry) {
-            console.timeEnd(module + ' - ' + entry);
+            console.timeEnd(this._timerName);
         };
         
         return timer;
